@@ -95,6 +95,9 @@ class VideoDatasetWithOpenCV(Dataset):
     def __len__(self):
         return len(self.video_names)
 
+    def get_vid_names(self):
+        return self.video_names
+
     def init_vid(self, vid_path):
         """
         初始化视频
@@ -306,19 +309,23 @@ if __name__ == "__main__":
     if args.database == 'LIVE-VQC':
         vid_names, ni_dict = get_vqc_mat_info()
         dataset = VideoDatasetWithOpenCV(vid_names, ni_dict)
+        vid_names = dataset.get_vid_names()
 
         feature_list = get_processed_vids(features_dir)
 
         for i in range(len(dataset)):
             print('[Info]' + '-' * 50)
+            name = vid_names[i]
+            if name in feature_list:
+                print('[Info] 已处理: {}'.format(name))
+                continue
+
             s_time = time.time()
             current_data = dataset[i]
             current_video = current_data['video']
             current_score = current_data['score']
             current_name = current_data['name']
-            if current_name in feature_list:
-                print('[Info] 已处理: {}'.format(current_name))
-                continue
+
             features = get_features(current_video, args.frame_batch_size, device)
             np.save(features_dir + str(current_name) + '_resnet-50_res5c', features.to('cpu').numpy())
             np.save(features_dir + str(current_name) + '_score', current_score)
