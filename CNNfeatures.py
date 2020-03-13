@@ -111,9 +111,9 @@ class VideoDatasetWithOpenCV(Dataset):
         return cap, n_frames, h, w
 
     def __getitem__(self, idx):
-        print('[Info] 解码视频开始!')
         s_time = time.time()
         video_name = self.video_names[idx]
+        print('[Info] 解码视频 {} 开始!'.format(video_name))
 
         score, path = self.name_info_dict[video_name]
         cap, n_frames, h, w = self.init_vid(path)
