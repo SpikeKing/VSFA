@@ -13,7 +13,7 @@ Created by C. L. Wang on 2020/3/12
 # CUDA_VISIBLE_DEVICES=0 python CNNfeatures.py --database=KoNViD-1k --frame_batch_size=64
 # CUDA_VISIBLE_DEVICES=1 python CNNfeatures.py --database=CVD2014 --frame_batch_size=32
 # CUDA_VISIBLE_DEVICES=0 python CNNfeatures.py --database=LIVE-Qualcomm --frame_batch_size=8
-
+import time
 import torch
 import cv2
 from torchvision import transforms, models
@@ -108,6 +108,7 @@ class VideoDatasetWithOpenCV(Dataset):
         return cap, n_frames, h, w
 
     def __getitem__(self, idx):
+        s_time = time.time()
         video_name = self.video_names[idx]
 
         score, path = self.name_info_dict[video_name]
@@ -134,8 +135,11 @@ class VideoDatasetWithOpenCV(Dataset):
             frame = Image.fromarray(frame)
             frame = transform(frame)
             transformed_video[idx] = frame
-
         print('[Info] transformed_video shape: {}'.format(transformed_video.shape))
+
+        elapsed_time = time.time() - s_time
+        print('[Info] 视频: {}, 值: {}, 帧数: {}, h: {}, w: {}, time: {}'.format(
+            video_name, score, n_frames, h, w, elapsed_time))
 
         sample = {'video': transformed_video,
                   'score': score}
