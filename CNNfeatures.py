@@ -250,7 +250,9 @@ def get_processed_vids(feature_dir):
     for name in names_list:
         xx = name.split('_')[0]
         feature_set.add(xx)
-    return feature_set
+    feature_list = list(feature_set)
+    print('[Info] 已处理视频: {}'.format(feature_list))
+    return feature_list
 
 
 if __name__ == "__main__":
@@ -305,7 +307,7 @@ if __name__ == "__main__":
         vid_names, ni_dict = get_vqc_mat_info()
         dataset = VideoDatasetWithOpenCV(vid_names, ni_dict)
 
-        feature_list = list(get_processed_vids(features_dir))
+        feature_list = get_processed_vids(features_dir)
 
         for i in range(len(dataset)):
             print('[Info]' + '-' * 50)
