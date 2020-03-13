@@ -1,19 +1,14 @@
 """Test Demo for Quality Assessment of In-the-Wild Videos, ACM MM 2019"""
-#
-# Author: Dingquan Li
-# Email: dingquanli AT pku DOT edu DOT cn
-# Date: 2018/3/27
-#
-import torch
-from torchvision import transforms
-import skvideo.io
-from PIL import Image
-import numpy as np
-from VSFA import VSFA
-from CNNfeatures import get_features
-from argparse import ArgumentParser
 import time
+from argparse import ArgumentParser
 
+import skvideo.io
+import torch
+from PIL import Image
+from torchvision import transforms
+
+from CNNfeatures import get_features
+from VSFA import VSFA
 
 if __name__ == "__main__":
     parser = ArgumentParser(description='"Test Demo of VSFA')
@@ -39,7 +34,8 @@ if __name__ == "__main__":
     # data preparation
     assert args.video_format == 'YUV420' or args.video_format == 'RGB'
     if args.video_format == 'YUV420':
-        video_data = skvideo.io.vread(args.video_path, args.video_height, args.video_width, inputdict={'-pix_fmt': 'yuvj420p'})
+        video_data = skvideo.io.vread(args.video_path, args.video_height, args.video_width,
+                                      inputdict={'-pix_fmt': 'yuvj420p'})
     else:
         video_data = skvideo.io.vread(args.video_path)
 
@@ -78,4 +74,4 @@ if __name__ == "__main__":
 
     end = time.time()
 
-    print('Time: {} s'.format(end-start))
+    print('Time: {} s'.format(end - start))
