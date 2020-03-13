@@ -293,6 +293,8 @@ if __name__ == "__main__":
         vid_names, ni_dict = get_vqc_mat_info()
         dataset = VideoDatasetWithOpenCV(vid_names, ni_dict)
         for i in range(len(dataset)):
+            print('[Info]' + '-' * 50)
+            s_time = time.time()
             current_data = dataset[i]
             current_video = current_data['video']
             current_score = current_data['score']
@@ -300,7 +302,8 @@ if __name__ == "__main__":
             features = get_features(current_video, args.frame_batch_size, device)
             np.save(features_dir + str(current_name) + '_resnet-50_res5c', features.to('cpu').numpy())
             np.save(features_dir + str(current_name) + '_score', current_score)
-            break
+            elapsed_time = time.time() - s_time
+            print('[Info] 视频: {}, time: {}'.format(current_name, elapsed_time))
         print('[Info] LIVE-VQC完成!')
     else:
         Info = h5py.File(datainfo, 'r')

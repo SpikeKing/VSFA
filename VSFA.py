@@ -54,7 +54,7 @@ class ANN(nn.Module):
 
     def forward(self, input):
         input = self.fc0(input)  # linear
-        for i in range(self.n_ANNlayers-1):  # nonlinear
+        for i in range(self.n_ANNlayers - 1):  # nonlinear
             input = self.fc(self.dropout(F.relu(input)))
         return input
 
@@ -62,7 +62,7 @@ class ANN(nn.Module):
 def TP(q, tau=12, beta=0.5):
     """subjectively-inspired temporal pooling"""
     q = torch.unsqueeze(torch.t(q), 0)
-    qm = -float('inf')*torch.ones((1, 1, tau-1)).to(q.device)
+    qm = -float('inf') * torch.ones((1, 1, tau - 1)).to(q.device)
     qp = 10000.0 * torch.ones((1, 1, tau - 1)).to(q.device)  #
     l = -F.max_pool1d(torch.cat((qm, -q), 2), tau, stride=1)
     m = F.avg_pool1d(torch.cat((q * torch.exp(-q), qp * torch.exp(-qp)), 2), tau, stride=1)
@@ -73,7 +73,6 @@ def TP(q, tau=12, beta=0.5):
 
 class VSFA(nn.Module):
     def __init__(self, input_size=4096, reduced_size=128, hidden_size=32):
-
         super(VSFA, self).__init__()
         self.hidden_size = hidden_size
         self.ann = ANN(input_size, reduced_size, 1)
@@ -130,7 +129,7 @@ if __name__ == "__main__":
                         help='flag whether to disable GPU')
     args = parser.parse_args()
 
-    args.decay_interval = int(args.epochs/10)
+    args.decay_interval = int(args.epochs / 10)
     args.decay_ratio = 0.8
 
     torch.manual_seed(args.seed)  #
@@ -162,6 +161,7 @@ if __name__ == "__main__":
     index = index[:, args.exp_id % index.shape[1]]  # np.random.permutation(N)
     ref_ids = Info['ref_ids'][0, :]  #
     max_len = int(Info['max_len'][0])
+
     trainindex = index[0:int(np.ceil((1 - args.test_ratio - args.val_ratio) * len(index)))]
     testindex = index[int(np.ceil((1 - args.test_ratio) * len(index))):len(index)]
     train_index, val_index, test_index = [], [], []
@@ -171,6 +171,7 @@ if __name__ == "__main__":
                 val_index.append(i)
 
     scale = Info['scores'][0, :].max()  # label normalization factor
+
     train_dataset = VQADataset(features_dir, train_index, max_len, scale=scale)
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
     val_dataset = VQADataset(features_dir, val_index, max_len, scale=scale)
@@ -230,7 +231,7 @@ if __name__ == "__main__":
         val_loss = L / (i + 1)
         val_PLCC = stats.pearsonr(y_pred, y_val)[0]
         val_SROCC = stats.spearmanr(y_pred, y_val)[0]
-        val_RMSE = np.sqrt(((y_pred-y_val) ** 2).mean())
+        val_RMSE = np.sqrt(((y_pred - y_val) ** 2).mean())
         val_KROCC = stats.stats.kendalltau(y_pred, y_val)[0]
 
         # Test
@@ -250,7 +251,7 @@ if __name__ == "__main__":
             test_loss = L / (i + 1)
             PLCC = stats.pearsonr(y_pred, y_test)[0]
             SROCC = stats.spearmanr(y_pred, y_test)[0]
-            RMSE = np.sqrt(((y_pred-y_test) ** 2).mean())
+            RMSE = np.sqrt(((y_pred - y_test) ** 2).mean())
             KROCC = stats.stats.kendalltau(y_pred, y_test)[0]
 
         if not args.disable_visualization:  # record training curves
@@ -298,7 +299,7 @@ if __name__ == "__main__":
         test_loss = L / (i + 1)
         PLCC = stats.pearsonr(y_pred, y_test)[0]
         SROCC = stats.spearmanr(y_pred, y_test)[0]
-        RMSE = np.sqrt(((y_pred-y_test) ** 2).mean())
+        RMSE = np.sqrt(((y_pred - y_test) ** 2).mean())
         KROCC = stats.stats.kendalltau(y_pred, y_test)[0]
         print("Test results: test loss={:.4f}, SROCC={:.4f}, KROCC={:.4f}, PLCC={:.4f}, RMSE={:.4f}"
               .format(test_loss, SROCC, KROCC, PLCC, RMSE))
