@@ -108,6 +108,7 @@ class VideoDatasetWithOpenCV(Dataset):
         return cap, n_frames, h, w
 
     def __getitem__(self, idx):
+        print('[Info] 解码视频开始!')
         s_time = time.time()
         video_name = self.video_names[idx]
 
@@ -135,11 +136,10 @@ class VideoDatasetWithOpenCV(Dataset):
             frame = Image.fromarray(frame)
             frame = transform(frame)
             transformed_video[idx] = frame
-        print('[Info] transformed_video shape: {}'.format(transformed_video.shape))
 
         elapsed_time = time.time() - s_time
-        print('[Info] 视频: {}, 值: {}, 帧数: {}, h: {}, w: {}, time: {}'.format(
-            video_name, score, n_frames, h, w, elapsed_time))
+        print('[Info] 视频: {}, 值: {}, 帧数: {}, h: {}, w: {}, vid_shape: {}, time: {}'.format(
+            video_name, score, n_frames, h, w, transformed_video.shape, elapsed_time))
 
         sample = {'video': transformed_video,
                   'score': score}
@@ -204,6 +204,8 @@ def get_vqc_mat_info():
     """
     数据集信息
     """
+    print('[Info] 初始化数据集!')
+    s_time = time.time()
     data_path = os.path.join(DATASETS_DIR, 'live_vqc')
     data_info_path = os.path.join(data_path, 'data.mat')
     data_info = loadmat(data_info_path)  # index, ref_ids
@@ -214,10 +216,8 @@ def get_vqc_mat_info():
     video_names, scores = [], []
     for vid_info in video_list_info:
         video_names.append(vid_info[0][0])
-    print('[Info] 视频数量: {}'.format(len(video_names)))
     for mos in mos_list_info:
         scores.append(mos[0])
-    print('[Info] MOS值: {}'.format(len(scores)))
 
     name_score_dict = dict()
     for vid_name, score in zip(video_names, scores):
@@ -228,7 +228,8 @@ def get_vqc_mat_info():
     for name, path in zip(names_list, paths_list):
         score = name_score_dict[name]
         name_info_dict[name] = (score, path)
-    print('[Info] 数据量: {}'.format(len(name_info_dict.keys())))
+    elapsed_time = time.time() - s_time
+    print('[Info] 数据量: {}, 耗时: {}'.format(len(name_info_dict.keys()), elapsed_time))
 
     return video_names, name_info_dict
 
