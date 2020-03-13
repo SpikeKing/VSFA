@@ -141,8 +141,11 @@ class VideoDatasetWithOpenCV(Dataset):
         print('[Info] 视频: {}, 值: {}, 帧数: {}, h: {}, w: {}, vid_shape: {}, time: {}'.format(
             video_name, score, n_frames, h, w, transformed_video.shape, elapsed_time))
 
-        sample = {'video': transformed_video,
-                  'score': score}
+        sample = {
+            'video': transformed_video,
+            'name': video_name,
+            'score': score
+        }
 
         return sample
 
@@ -174,6 +177,8 @@ def global_std_pool2d(x):
 
 def get_features(video_data, frame_batch_size=64, device='cuda'):
     """feature extraction"""
+    print('[Info] 提取特征开始!')
+    s_time = time.time()
     extractor = ResNet50().to(device)
     video_length = video_data.shape[0]
     frame_start = 0
@@ -197,6 +202,8 @@ def get_features(video_data, frame_batch_size=64, device='cuda'):
         output2 = torch.cat((output2, features_std), 0)
         output = torch.cat((output1, output2), 1).squeeze()
 
+    elapsed_time = time.time() - s_time
+    print('[Info] 特征: {}, 耗时: {}'.format(output.shape, elapsed_time))
     return output
 
 
@@ -280,6 +287,7 @@ if __name__ == "__main__":
         os.makedirs(features_dir)
 
     device = torch.device("cuda" if not args.disable_gpu and torch.cuda.is_available() else "cpu")
+    print('[Info] device: {}'.format(device))
 
     if args.database == 'LIVE-VQC':
         vid_names, ni_dict = get_vqc_mat_info()
@@ -288,6 +296,10 @@ if __name__ == "__main__":
             current_data = dataset[i]
             current_video = current_data['video']
             current_score = current_data['score']
+            current_name = current_data['name']
+            features = get_features(current_video, args.frame_batch_size, device)
+            np.save(features_dir + str(current_name) + '_resnet-50_res5c', features.to('cpu').numpy())
+            np.save(features_dir + str(current_name) + '_score', current_score)
             break
         print('[Info] LIVE-VQC完成!')
     else:
