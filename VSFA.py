@@ -28,11 +28,13 @@ class VQADataset(Dataset):
         self.features = np.zeros((len(index), max_len, feat_dim))
         self.length = np.zeros((len(index), 1))
         self.mos = np.zeros((len(index), 1))
+
         for i in range(len(index)):
             features = np.load(features_dir + str(index[i]) + '_resnet-50_res5c.npy')
             self.length[i] = features.shape[0]
             self.features[i, :features.shape[0], :] = features
             self.mos[i] = np.load(features_dir + str(index[i]) + '_score.npy')  #
+
         self.scale = scale  #
         self.label = self.mos / self.scale  # label normalization
 

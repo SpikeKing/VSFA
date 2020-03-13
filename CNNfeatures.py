@@ -241,6 +241,18 @@ def get_vqc_mat_info():
     return video_names, name_info_dict
 
 
+def get_processed_vids(feature_dir):
+    """
+    已处理的视频
+    """
+    paths_list, names_list = traverse_dir_files(feature_dir, ext='.npy')
+    feature_set = set()
+    for name in names_list:
+        xx = name.split('_')[0]
+        feature_set.add(xx)
+    return feature_set
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(description='"Extracting Content-Aware Perceptual Features using Pre-Trained ResNet-50')
     parser.add_argument("--seed", type=int, default=19920517)
@@ -292,6 +304,9 @@ if __name__ == "__main__":
     if args.database == 'LIVE-VQC':
         vid_names, ni_dict = get_vqc_mat_info()
         dataset = VideoDatasetWithOpenCV(vid_names, ni_dict)
+
+        feature_list = list(get_processed_vids(features_dir))
+
         for i in range(len(dataset)):
             print('[Info]' + '-' * 50)
             s_time = time.time()
@@ -299,11 +314,15 @@ if __name__ == "__main__":
             current_video = current_data['video']
             current_score = current_data['score']
             current_name = current_data['name']
+            if current_name in feature_list:
+                print('[Info] 已处理: {}'.format(current_name))
+                continue
             features = get_features(current_video, args.frame_batch_size, device)
             np.save(features_dir + str(current_name) + '_resnet-50_res5c', features.to('cpu').numpy())
             np.save(features_dir + str(current_name) + '_score', current_score)
             elapsed_time = time.time() - s_time
             print('[Info] 视频: {}, time: {}'.format(current_name, elapsed_time))
+
         print('[Info] LIVE-VQC完成!')
     else:
         Info = h5py.File(datainfo, 'r')
