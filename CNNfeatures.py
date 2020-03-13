@@ -284,6 +284,7 @@ if __name__ == "__main__":
             current_video = current_data['video']
             current_score = current_data['score']
             break
+        print('[Info] LIVE-VQC完成!')
     else:
         Info = h5py.File(datainfo, 'r')
         vid_names = [Info[Info['video_names'][0, :][i]][()].tobytes()[::2].decode() for i in
