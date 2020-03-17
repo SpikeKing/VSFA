@@ -244,8 +244,8 @@ class VideoDatasetWithOpenCV(Dataset):
 
         score, path = self.name_info_dict[video_name]
 
-        # transformed_video = self.get_transformed_video_mp(path, self.n_max)
-        transformed_video = self.get_transformed_video(path, self.n_max)  # 单进程
+        transformed_video = self.get_transformed_video_mp(path, self.n_max)
+        # transformed_video = self.get_transformed_video(path, self.n_max)  # 单进程
 
         sample = {
             'video': transformed_video,
