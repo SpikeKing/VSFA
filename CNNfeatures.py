@@ -123,7 +123,7 @@ class VideoDatasetWithOpenCV(Dataset):
 
         tensor_list = []
         for idx in idx_list:
-            print('[Info] 帧idx: {}'.format(idx))
+            # print('[Info] 帧idx: {}'.format(idx))
             try:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
                 ret, frame = cap.read()
@@ -134,6 +134,8 @@ class VideoDatasetWithOpenCV(Dataset):
             except Exception as e:
                 print('[Info] 异常帧: {}'.format(idx))
                 continue
+            if idx % 100 == 0:
+                print('[Info] 已处理: {}'.format(idx))
 
             tensor_list.append(frame_tensor)
 
