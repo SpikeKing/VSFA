@@ -36,18 +36,20 @@ from utils.project_utils import traverse_dir_files
 from utils.vqa_utils import unify_size, init_vid
 
 
-def get_frame(file_name, idx):
+def get_frame(file_name, idx, h, w):
     cap = cv2.VideoCapture(file_name)  # crashes here
     # print("opened capture {}".format(mp.current_process()))
     try:
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ret, k_frame = cap.read()
+        ret, frame = cap.read()
+        frame = cv2.resize(frame, (w, h))
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     except Exception as e:
         print('[Info] 帧异常: {}'.format(idx))
-        k_frame = None
+        frame = None
 
     cap.release()
-    return idx, k_frame
+    return idx, frame
 
 
 class VideoDataset(Dataset):
@@ -167,11 +169,13 @@ class VideoDatasetWithOpenCV(Dataset):
         s_time = time.time()
         n_prc = mp.cpu_count()
         cap, n_frame, h, w = init_vid(path)
+
+        h, w = unify_size(h, w, ms=512)
         pool = Pool(n_prc)
 
         prc_list = []
         for idx in range(n_frame):
-            prc_list.append(pool.apply_async(get_frame, args=(path, idx)))
+            prc_list.append(pool.apply_async(get_frame, args=(path, idx, h, w)))
 
         pool.close()
         pool.join()
