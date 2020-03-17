@@ -3,34 +3,37 @@
 """
 Copyright (c) 2019. All rights reserved.
 Created by C. L. Wang on 2020/3/12
-"""
 
-"""Extracting Content-Aware Perceptual Features using Pre-Trained ResNet-50"""
-# Author: Dingquan Li
-# Email: dingquanli AT pku DOT edu DOT cn
-# Date: 2018/3/27
-# 
+
 # CUDA_VISIBLE_DEVICES=0 python CNNfeatures.py --database=KoNViD-1k --frame_batch_size=64
 # CUDA_VISIBLE_DEVICES=1 python CNNfeatures.py --database=CVD2014 --frame_batch_size=32
 # CUDA_VISIBLE_DEVICES=0 python CNNfeatures.py --database=LIVE-Qualcomm --frame_batch_size=8
-import time
-import torch
-import cv2
-from torchvision import transforms, models
-import torch.nn as nn
-from torch.utils.data import Dataset
-import skvideo.io
-from PIL import Image
+
+"""
+
+"""Extracting Content-Aware Perceptual Features using Pre-Trained ResNet-50"""
+import multiprocessing as mp
 import os
+import random
+
+import time
+from argparse import ArgumentParser
+from multiprocessing import Pool
+
+import cv2
 import h5py
 import numpy as np
-import random
-from argparse import ArgumentParser
+import skvideo.io
+import torch
+import torch.nn as nn
+from PIL import Image
 from scipy.io import loadmat
+from torch.utils.data import Dataset
+from torchvision import transforms, models
 
 from root_dir import DATASETS_DIR
-from utils.vqa_utils import unify_size
 from utils.project_utils import traverse_dir_files
+from utils.vqa_utils import unify_size, init_vid
 
 
 class VideoDataset(Dataset):
@@ -98,25 +101,12 @@ class VideoDatasetWithOpenCV(Dataset):
     def get_vid_names(self):
         return self.video_names
 
-    def init_vid(self, vid_path):
-        """
-        初始化视频
-        """
-        cap = cv2.VideoCapture(vid_path)
-        n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-
-        return cap, n_frames, h, w
-
-    def __getitem__(self, idx):
+    @staticmethod
+    def get_transformed_video(path):
         s_time = time.time()
-        video_name = self.video_names[idx]
-        print('[Info] 解码视频 {} 开始!'.format(video_name))
 
-        score, path = self.name_info_dict[video_name]
-        cap, n_frames, h, w = self.init_vid(path)
+        cap, n_frames, h, w = init_vid(path)
+        print('[Info] 帧数: {}, h: {}, w: {}'.format(n_frames, h, w))
 
         h, w = unify_size(h, w, ms=512)
 
@@ -129,20 +119,93 @@ class VideoDatasetWithOpenCV(Dataset):
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
-        transformed_video = torch.zeros([n_frames, 3, h, w])
+        # transformed_video = torch.zeros([n_frames, 3, h, w])
 
+        tensor_list = []
         for idx in idx_list:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-            ret, frame = cap.read()
-            frame = cv2.resize(frame, (w, h))
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            print('[Info] 帧idx: {}'.format(idx))
+            try:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                ret, frame = cap.read()
+                frame = cv2.resize(frame, (w, h))
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame = Image.fromarray(frame)
+                frame_tensor = transform(frame)
+            except Exception as e:
+                print('[Info] 异常帧: {}'.format(idx))
+                continue
+
+            tensor_list.append(frame_tensor)
+
+        transformed_video = torch.stack(tensor_list, dim=0)  # 合并tensor
+
+        cap.release()
+        elapsed_time = time.time() - s_time
+
+        print('[Info] vid_shape: {}, time: {}, 视频: {}'.format(transformed_video.shape, elapsed_time, path))
+
+        return transformed_video
+
+    @staticmethod
+    def get_transformed_video_mp(path):
+        s_time = time.time()
+        n_prc = mp.cpu_count()
+        cap, n_frame, h, w = init_vid(path)
+        pool = Pool(n_prc)
+
+        def get_frame(file_name, idx):
+            cap = cv2.VideoCapture(file_name)  # crashes here
+            # print("opened capture {}".format(mp.current_process()))
+            try:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                ret, k_frame = cap.read()
+            except Exception as e:
+                print('[Info] 帧异常: {}'.format(idx))
+                k_frame = None
+
+            cap.release()
+            return idx, k_frame
+
+        prc_list = []
+        for idx in range(n_frame):
+            prc_list.append(pool.apply_async(get_frame, args=(path, idx)))
+
+        pool.close()
+        pool.join()
+
+        res_dict = {}
+        for r_prc in prc_list:
+            idx, frame = r_prc.get()
+            res_dict[idx] = frame
+
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+
+        tensor_list = []
+        for i in range(n_frame):
+            frame = res_dict[i]
+            if not frame:
+                continue
             frame = Image.fromarray(frame)
-            frame = transform(frame)
-            transformed_video[idx] = frame
+            frame_tensor = transform(frame)
+            tensor_list.append(frame_tensor)
+
+        transformed_video = torch.stack(tensor_list, dim=0)  # 合并tensor
 
         elapsed_time = time.time() - s_time
-        print('[Info] 视频: {}, 值: {}, 帧数: {}, h: {}, w: {}, vid_shape: {}, time: {}'.format(
-            video_name, score, n_frames, h, w, transformed_video.shape, elapsed_time))
+        print('[Info] vid_shape: {}, time: {}, 视频: {}'.format(transformed_video.shape, elapsed_time, path))
+
+        return transformed_video
+
+    def __getitem__(self, idx):
+        video_name = self.video_names[idx]
+        print('[Info] 解码视频 {} 开始!'.format(video_name))
+
+        score, path = self.name_info_dict[video_name]
+
+        transformed_video = self.get_transformed_video(path)
 
         sample = {
             'video': transformed_video,
@@ -258,7 +321,7 @@ def get_processed_vids(feature_dir):
     return feature_list
 
 
-if __name__ == "__main__":
+def main():
     parser = ArgumentParser(description='"Extracting Content-Aware Perceptual Features using Pre-Trained ResNet-50')
     parser.add_argument("--seed", type=int, default=19920517)
     parser.add_argument('--database', default='KoNViD-1k', type=str,
@@ -351,3 +414,7 @@ if __name__ == "__main__":
             features = get_features(current_video, args.frame_batch_size, device)
             np.save(features_dir + str(i) + '_resnet-50_res5c', features.to('cpu').numpy())
             np.save(features_dir + str(i) + '_score', current_score)
+
+
+if __name__ == "__main__":
+    main()
