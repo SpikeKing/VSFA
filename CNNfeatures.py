@@ -10,6 +10,9 @@ Created by C. L. Wang on 2020/3/12
 # CUDA_VISIBLE_DEVICES=0 python CNNfeatures.py --database=LIVE-Qualcomm --frame_batch_size=8
 
 """
+from math import floor
+
+import xlsxwriter
 
 """Extracting Content-Aware Perceptual Features using Pre-Trained ResNet-50"""
 import multiprocessing as mp
@@ -103,13 +106,14 @@ class VideoDataset(Dataset):
 class VideoDatasetWithOpenCV(Dataset):
     """Read data from the original dataset for feature extraction"""
 
-    def __init__(self, video_names, name_info_dict):
+    def __init__(self, video_names, name_info_dict, n_max=25):
         super(VideoDatasetWithOpenCV, self).__init__()
 
         assert len(video_names) == len(name_info_dict.keys())
 
         self.video_names = video_names
         self.name_info_dict = name_info_dict
+        self.n_max = n_max
 
     def __len__(self):
         return len(self.video_names)
@@ -118,17 +122,28 @@ class VideoDatasetWithOpenCV(Dataset):
         return self.video_names
 
     @staticmethod
-    def get_transformed_video(path):
+    def get_transformed_video(path, num_max):
         s_time = time.time()
 
-        cap, n_frames, h, w = init_vid(path)
-        print('[Info] 帧数: {}, h: {}, w: {}'.format(n_frames, h, w))
+        cap, n_frame, h, w = init_vid(path)
+        print('[Info] 帧数: {}, h: {}, w: {}'.format(n_frame, h, w))
 
         h, w = unify_size(h, w, ms=512)
 
+        # idx_list = []
+        # for idx in range(n_frames):
+        #     idx_list.append(idx)
+
+        max_gap = num_max  # 最大帧数
         idx_list = []
-        for idx in range(n_frames):
-            idx_list.append(idx)
+        if n_frame > max_gap:
+            v_gap = float(n_frame) / float(max_gap)  # 只使用100帧
+            for gap_idx in range(max_gap):
+                idx = int(floor(gap_idx * v_gap))
+                idx_list.append(idx)
+        else:
+            for gap_idx in range(n_frame):
+                idx_list.append(gap_idx)
 
         transform = transforms.Compose([
             transforms.ToTensor(),
@@ -137,6 +152,7 @@ class VideoDatasetWithOpenCV(Dataset):
 
         # transformed_video = torch.zeros([n_frames, 3, h, w])
 
+        print('[Info] 特征帧数: {}'.format(len(idx_list)))
         tensor_list = []
         for idx in idx_list:
             # print('[Info] 帧idx: {}'.format(idx))
@@ -165,16 +181,29 @@ class VideoDatasetWithOpenCV(Dataset):
         return transformed_video
 
     @staticmethod
-    def get_transformed_video_mp(path):
+    def get_transformed_video_mp(path, num_max):
         s_time = time.time()
-        n_prc = mp.cpu_count()
+        # n_prc = mp.cpu_count()
+        n_prc = 10
         cap, n_frame, h, w = init_vid(path)
 
         h, w = unify_size(h, w, ms=512)
         pool = Pool(n_prc)
 
+        max_gap = num_max  # 最大帧数
+        idx_list = []
+        if n_frame > max_gap:
+            v_gap = float(n_frame) / float(max_gap)  # 只使用100帧
+            for gap_idx in range(max_gap):
+                idx = int(floor(gap_idx * v_gap))
+                idx_list.append(idx)
+        else:
+            for gap_idx in range(n_frame):
+                idx_list.append(gap_idx)
+
         prc_list = []
-        for idx in range(n_frame):
+        # for idx in range(n_frame):
+        for idx in idx_list:
             prc_list.append(pool.apply_async(get_frame, args=(path, idx, h, w)))
 
         pool.close()
@@ -215,8 +244,8 @@ class VideoDatasetWithOpenCV(Dataset):
 
         score, path = self.name_info_dict[video_name]
 
-        # transformed_video = self.get_transformed_video(path)
-        transformed_video = self.get_transformed_video_mp(path)  # 多进程
+        # transformed_video = self.get_transformed_video_mp(path, self.n_max)
+        transformed_video = self.get_transformed_video(path, self.n_max)  # 单进程
 
         sample = {
             'video': transformed_video,
@@ -284,14 +313,14 @@ def get_features(video_data, frame_batch_size=64, device='cuda'):
     return output
 
 
-def get_vqc_mat_info():
+def get_vqc_mat_info(vid_dir):
     """
     数据集信息
     """
     print('[Info] 初始化数据集!')
     s_time = time.time()
-    data_path = os.path.join(DATASETS_DIR, 'live_vqc')
-    data_info_path = os.path.join(data_path, 'data.mat')
+    # data_path = os.path.join(DATASETS_DIR, 'live_vqc')
+    data_info_path = os.path.join(vid_dir, 'data.mat')
     data_info = loadmat(data_info_path)  # index, ref_ids
 
     video_list_info = data_info['video_list']
@@ -308,7 +337,7 @@ def get_vqc_mat_info():
         name_score_dict[vid_name] = score
 
     name_info_dict = dict()
-    paths_list, names_list = traverse_dir_files(data_path, ext='.mp4')
+    paths_list, names_list = traverse_dir_files(vid_dir, ext='.mp4')
     for name, path in zip(names_list, paths_list):
         score = name_score_dict[name]
         name_info_dict[name] = (score, path)
@@ -370,9 +399,11 @@ def main():
         features_dir = 'CNN_features_LIVE-Qualcomm/'
         datainfo = 'data/LIVE-Qualcomminfo.mat'
     if args.database == 'LIVE-VQC':
-        videos_dir = ""  # 视频文件夹
-        features_dir = "CNN_features_LIVE-VQC/"  # CNN特征
+        n_max = 25  # 最大处理帧数
+        videos_dir = os.path.join(DATASETS_DIR, 'live_vqc')  # 视频文件夹
+        features_dir = "CNN_features_LIVE-VQC-{}/".format(n_max)  # CNN特征
         datainfo = 'data/LIVE-VQC.mat'  # 数据信息
+        test_excel = "live_vqc_{}.xlsx".format(n_max)
 
     if not os.path.exists(features_dir):
         os.makedirs(features_dir)
@@ -381,12 +412,20 @@ def main():
     print('[Info] device: {}'.format(device))
 
     if args.database == 'LIVE-VQC':
-        vid_names, ni_dict = get_vqc_mat_info()
-        dataset = VideoDatasetWithOpenCV(vid_names, ni_dict)
+
+        wk = xlsxwriter.Workbook(test_excel)
+        ws = wk.add_worksheet()
+        titles = [u"视频", u"帧数", u"总耗时", u"解码时间", "特征时间"]
+        for i, t in enumerate(titles):
+            ws.write(0, i, t)
+
+        vid_names, ni_dict = get_vqc_mat_info(videos_dir)
+        dataset = VideoDatasetWithOpenCV(vid_names, ni_dict, n_max)
         vid_names = dataset.get_vid_names()
 
         feature_list = get_processed_vids(features_dir)
 
+        n_rows = 1
         for i in range(len(dataset)):
             print('[Info]' + '-' * 50)
             name = vid_names[i]
@@ -396,16 +435,32 @@ def main():
 
             s_time = time.time()
             current_data = dataset[i]
+            e_time1 = time.time()
+            time_decode = e_time1 - s_time
+            print('[Info] 解码时间: {}'.format(time_decode))
+
             current_video = current_data['video']
             current_score = current_data['score']
             current_name = current_data['name']
 
             features = get_features(current_video, args.frame_batch_size, device)
+            e_time2 = time.time()
+            time_feature = e_time2 - e_time1
+            print('[Info] 特征时间: {}'.format(time_feature))
+
+            elapsed_time = time.time() - s_time
+            print('[Info] 视频: {}, 总耗时: {}'.format(current_name, elapsed_time))
+
+            ws.write(n_rows, 1, name)
+            ws.write(n_rows, 2, round(elapsed_time, 4))
+            ws.write(n_rows, 3, round(time_decode, 4))
+            ws.write(n_rows, 4, round(time_feature, 4))
+            n_rows += 1
+
             np.save(features_dir + str(current_name) + '_resnet-50_res5c', features.to('cpu').numpy())
             np.save(features_dir + str(current_name) + '_score', current_score)
-            elapsed_time = time.time() - s_time
-            print('[Info] 视频: {}, time: {}'.format(current_name, elapsed_time))
 
+        wk.close()
         print('[Info] LIVE-VQC完成!')
     else:
         Info = h5py.File(datainfo, 'r')
