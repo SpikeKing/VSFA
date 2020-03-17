@@ -188,11 +188,14 @@ class VideoDatasetWithOpenCV(Dataset):
 
         tensor_list = []
         for i in range(n_frame):
-            frame = res_dict[i]
-            if not frame:
+            try:
+                frame = res_dict[i]
+                frame = Image.fromarray(frame)
+                frame_tensor = transform(frame)
+            except Exception:
+                print('[Info] 帧异常: {}'.format(i))
                 continue
-            frame = Image.fromarray(frame)
-            frame_tensor = transform(frame)
+
             tensor_list.append(frame_tensor)
 
         transformed_video = torch.stack(tensor_list, dim=0)  # 合并tensor
