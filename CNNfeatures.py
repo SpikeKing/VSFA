@@ -36,6 +36,20 @@ from utils.project_utils import traverse_dir_files
 from utils.vqa_utils import unify_size, init_vid
 
 
+def get_frame(file_name, idx):
+    cap = cv2.VideoCapture(file_name)  # crashes here
+    # print("opened capture {}".format(mp.current_process()))
+    try:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, k_frame = cap.read()
+    except Exception as e:
+        print('[Info] 帧异常: {}'.format(idx))
+        k_frame = None
+
+    cap.release()
+    return idx, k_frame
+
+
 class VideoDataset(Dataset):
     """Read data from the original dataset for feature extraction"""
 
@@ -154,19 +168,6 @@ class VideoDatasetWithOpenCV(Dataset):
         n_prc = mp.cpu_count()
         cap, n_frame, h, w = init_vid(path)
         pool = Pool(n_prc)
-
-        def get_frame(file_name, idx):
-            cap = cv2.VideoCapture(file_name)  # crashes here
-            # print("opened capture {}".format(mp.current_process()))
-            try:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-                ret, k_frame = cap.read()
-            except Exception as e:
-                print('[Info] 帧异常: {}'.format(idx))
-                k_frame = None
-
-            cap.release()
-            return idx, k_frame
 
         prc_list = []
         for idx in range(n_frame):
