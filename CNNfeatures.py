@@ -220,7 +220,7 @@ class VideoDatasetWithOpenCV(Dataset):
         ])
 
         tensor_list = []
-        for i in range(n_frame):
+        for i in idx_list:
             try:
                 frame = res_dict[i]
                 frame = Image.fromarray(frame)
