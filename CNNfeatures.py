@@ -15,7 +15,6 @@ from math import floor
 import xlsxwriter
 
 """Extracting Content-Aware Perceptual Features using Pre-Trained ResNet-50"""
-import multiprocessing as mp
 import os
 import random
 
