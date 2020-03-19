@@ -228,7 +228,7 @@ def main():
 
     if not os.path.exists('models'):
         os.makedirs('models')
-    trained_model_file = 'models/{}-{}-EXP{}.pt'.format(args.model, args.database, args.exp_id)
+    trained_model_file = 'models/{}-{}-EXP{}'.format(args.model, args.database, args.exp_id)
     if not os.path.exists('results'):
         os.makedirs('results')
     save_result_file = 'results/{}-{}-EXP{}'.format(args.model, args.database, args.exp_id)
@@ -321,7 +321,7 @@ def main():
                 print("Test results: test loss={:.4f}, SROCC={:.4f}, KROCC={:.4f}, PLCC={:.4f}, RMSE={:.4f}"
                       .format(test_loss, SROCC, KROCC, PLCC, RMSE))
                 np.save(save_result_file, (y_pred, y_test, test_loss, SROCC, KROCC, PLCC, RMSE, test_index))
-            torch.save(model.state_dict(), trained_model_file)
+            torch.save(model.state_dict(), trained_model_file + "{}.pt".format(best_val_criterion))
             best_val_criterion = val_SROCC  # update best val SROCC
 
     # Test
