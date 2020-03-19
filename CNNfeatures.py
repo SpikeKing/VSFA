@@ -105,10 +105,15 @@ class VideoDataset(Dataset):
 class VideoDatasetWithOpenCV(Dataset):
     """Read data from the original dataset for feature extraction"""
 
-    def __init__(self, video_names, name_info_dict, n_max=25):
+    def __init__(self, video_names, name_info_dict, n_max=25, is_mp=True):
         super(VideoDatasetWithOpenCV, self).__init__()
 
         assert len(video_names) == len(name_info_dict.keys())
+        self.is_mp = is_mp
+        if self.is_mp:
+            print('[Info] 提取特征: 多进程')
+        else:
+            print('[Info] 提取特征: 单进程')
 
         self.video_names = video_names
         self.name_info_dict = name_info_dict
@@ -243,8 +248,10 @@ class VideoDatasetWithOpenCV(Dataset):
 
         score, path = self.name_info_dict[video_name]
 
-        transformed_video = self.get_transformed_video_mp(path, self.n_max)
-        # transformed_video = self.get_transformed_video(path, self.n_max)  # 单进程
+        if self.is_mp:
+            transformed_video = self.get_transformed_video_mp(path, self.n_max)
+        else:
+            transformed_video = self.get_transformed_video(path, self.n_max)  # 单进程
 
         sample = {
             'video': transformed_video,
