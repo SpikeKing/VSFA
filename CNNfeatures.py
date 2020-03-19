@@ -373,9 +373,10 @@ def main():
                         help='database name (default: KoNViD-1k)')
     parser.add_argument('--frame_batch_size', type=int, default=64,
                         help='frame batch size for feature extraction (default: 64)')
-
     parser.add_argument('--disable_gpu', action='store_true',
                         help='flag whether to disable GPU')
+    parser.add_argument('--max_frames', type=int, help='max frames from videos')
+
     args = parser.parse_args()
 
     args.seed = 19920517
@@ -404,7 +405,9 @@ def main():
         features_dir = 'CNN_features_LIVE-Qualcomm/'
         datainfo = 'data/LIVE-Qualcomminfo.mat'
     if args.database == 'LIVE-VQC':
-        n_max = 25  # 最大处理帧数
+        # n_max = 25  # 最大处理帧数
+        n_max = args.max_frames  # 最大处理帧数
+        print('[Info] LIVE-VQC 最大帧数: {}'.format(n_max))
         videos_dir = os.path.join(DATASETS_DIR, 'live_vqc')  # 视频文件夹
         features_dir = "CNN_features_LIVE-VQC-{}/".format(n_max)  # CNN特征
         datainfo = 'data/LIVE-VQC.mat'  # 数据信息
