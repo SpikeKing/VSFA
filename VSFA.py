@@ -228,7 +228,7 @@ def main():
 
     if not os.path.exists('models'):
         os.makedirs('models')
-    trained_model_file = 'models/{}-{}-EXP{}'.format(args.model, args.database, args.exp_id)
+    trained_model_file = 'models/{}-{}-EXP{}.pt'.format(args.model, args.database, args.exp_id)
     if not os.path.exists('results'):
         os.makedirs('results')
     save_result_file = 'results/{}-{}-EXP{}'.format(args.model, args.database, args.exp_id)
@@ -314,6 +314,8 @@ def main():
 
         # Update the model with the best val_SROCC
         if val_SROCC > best_val_criterion:
+            print()
+            print('-' * 50)
             print("EXP ID={}: Update best model using best_val_criterion in epoch {}".format(args.exp_id, epoch))
             print("Val results: val loss={:.4f}, SROCC={:.4f}, KROCC={:.4f}, PLCC={:.4f}, RMSE={:.4f}"
                   .format(val_loss, val_SROCC, val_KROCC, val_PLCC, val_RMSE))
@@ -321,8 +323,9 @@ def main():
                 print("Test results: test loss={:.4f}, SROCC={:.4f}, KROCC={:.4f}, PLCC={:.4f}, RMSE={:.4f}"
                       .format(test_loss, SROCC, KROCC, PLCC, RMSE))
                 np.save(save_result_file, (y_pred, y_test, test_loss, SROCC, KROCC, PLCC, RMSE, test_index))
-            torch.save(model.state_dict(), trained_model_file + "{}.pt".format(best_val_criterion))
+            torch.save(model.state_dict(), trained_model_file)
             best_val_criterion = val_SROCC  # update best val SROCC
+            print('[Info] 最优结果 best_val_criterion: {}'.format(best_val_criterion))
 
     # Test
     if args.test_ratio > 0:
