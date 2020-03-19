@@ -155,3 +155,10 @@ dmypy.json
 .idea/
 datasets/
 test/
+
+logs/
+models/
+results/
+CNN_features_*/
+
+*.xlsx

@@ -337,9 +337,15 @@ def get_vqc_mat_info(vid_dir):
 
     name_info_dict = dict()
     paths_list, names_list = traverse_dir_files(vid_dir, ext='.mp4')
+
+    score_list = []
     for name, path in zip(names_list, paths_list):
         score = name_score_dict[name]
+        score_list.append(score)
         name_info_dict[name] = (score, path)
+
+    max_score = np.max(np.asarray(score_list))
+    print('[Info] max_score: {}'.format(max_score))
     elapsed_time = time.time() - s_time
     print('[Info] 数据量: {}, 耗时: {}'.format(len(name_info_dict.keys()), elapsed_time))
 
@@ -483,3 +489,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # get_vqc_mat_info(vid_dir=os.path.join(DATASETS_DIR, 'live_vqc'))

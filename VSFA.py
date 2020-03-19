@@ -7,6 +7,7 @@
 # tensorboard --logdir=logs --port=6006
 # CUDA_VISIBLE_DEVICES=1 python VSFA.py --database=KoNViD-1k --exp_id=0
 
+import copy
 from argparse import ArgumentParser
 import os
 import h5py
@@ -97,7 +98,19 @@ class VSFA(nn.Module):
         return h0
 
 
-if __name__ == "__main__":
+def get_livevqc_index(feature_dir):
+    from utils.project_utils import traverse_dir_files
+    paths_list, names_list = traverse_dir_files(feature_dir, ext='.npy')
+
+    res_names = set()
+    for name in names_list:
+        res_names.add(name.split('_')[0])
+
+    res_names = sorted(list(res_names))
+    return res_names
+
+
+def main():
     parser = ArgumentParser(description='"VSFA: Quality Assessment of In-the-Wild Videos')
     parser.add_argument("--seed", type=int, default=19920517)
     parser.add_argument('--lr', type=float, default=0.00001,
@@ -131,6 +144,9 @@ if __name__ == "__main__":
                         help='flag whether to disable GPU')
     args = parser.parse_args()
 
+    # 参考
+    # args.database = "LIVE-VQC"
+
     args.decay_interval = int(args.epochs / 10)
     args.decay_ratio = 0.8
 
@@ -151,6 +167,9 @@ if __name__ == "__main__":
     if args.database == 'LIVE-Qualcomm':
         features_dir = 'CNN_features_LIVE-Qualcomm/'
         datainfo = 'data/LIVE-Qualcomminfo.mat'
+    if args.database == 'LIVE-VQC':
+        features_dir = 'CNN_features_LIVE-VQC-25/'
+        datainfo = None
 
     print('EXP ID: {}'.format(args.exp_id))
     print(args.database)
@@ -158,11 +177,19 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if not args.disable_gpu and torch.cuda.is_available() else "cpu")
 
-    Info = h5py.File(datainfo, 'r')  # index, ref_ids
-    index = Info['index']
-    index = index[:, args.exp_id % index.shape[1]]  # np.random.permutation(N)
-    ref_ids = Info['ref_ids'][0, :]  #
-    max_len = int(Info['max_len'][0])
+    if args.database == "LIVE-VQC":
+        index = get_livevqc_index(features_dir)
+        ref_ids = copy.deepcopy(index)
+        random.shuffle(index)
+        max_len = 25
+        scale = 100
+    else:
+        Info = h5py.File(datainfo, 'r')  # index, ref_ids
+        index = Info['index']
+        index = index[:, args.exp_id % index.shape[1]]  # np.random.permutation(N)
+        ref_ids = Info['ref_ids'][0, :]  #
+        max_len = int(Info['max_len'][0])
+        scale = Info['scores'][0, :].max()  # label normalization factor
 
     trainindex = index[0:int(np.ceil((1 - args.test_ratio - args.val_ratio) * len(index)))]
     testindex = index[int(np.ceil((1 - args.test_ratio) * len(index))):len(index)]
@@ -172,7 +199,22 @@ if __name__ == "__main__":
             test_index.append(i) if (ref_ids[i] in testindex) else \
                 val_index.append(i)
 
-    scale = Info['scores'][0, :].max()  # label normalization factor
+    if args.database == "LIVE-VQC":
+        names = get_livevqc_index(features_dir)
+        train_index_tmp = []
+        for i in train_index:
+            train_index_tmp.append(names[i])
+        train_index = train_index_tmp
+
+        val_index_tmp = []
+        for i in val_index:
+            val_index_tmp.append(names[i])
+        val_index = val_index_tmp
+
+        test_index_tmp = []
+        for i in test_index:
+            test_index_tmp.append(names[i])
+        test_index = test_index_tmp
 
     train_dataset = VQADataset(features_dir, train_index, max_len, scale=scale)
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
@@ -186,7 +228,7 @@ if __name__ == "__main__":
 
     if not os.path.exists('models'):
         os.makedirs('models')
-    trained_model_file = 'models/{}-{}-EXP{}'.format(args.model, args.database, args.exp_id)
+    trained_model_file = 'models/{}-{}-EXP{}.pt'.format(args.model, args.database, args.exp_id)
     if not os.path.exists('results'):
         os.makedirs('results')
     save_result_file = 'results/{}-{}-EXP{}'.format(args.model, args.database, args.exp_id)
@@ -306,3 +348,7 @@ if __name__ == "__main__":
         print("Test results: test loss={:.4f}, SROCC={:.4f}, KROCC={:.4f}, PLCC={:.4f}, RMSE={:.4f}"
               .format(test_loss, SROCC, KROCC, PLCC, RMSE))
         np.save(save_result_file, (y_pred, y_test, test_loss, SROCC, KROCC, PLCC, RMSE, test_index))
+
+
+if __name__ == "__main__":
+    main()
