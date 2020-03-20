@@ -142,11 +142,11 @@ def main():
                         help="log directory for Tensorboard log output")
     parser.add_argument('--disable_gpu', action='store_true',
                         help='flag whether to disable GPU')
+    parser.add_argument('--num_frame', type=int, default=25, help='num frame of features')
     args = parser.parse_args()
 
     # 参考
     # args.database = "LIVE-VQC"
-
     args.decay_interval = int(args.epochs / 10)
     args.decay_ratio = 0.8
 
@@ -158,6 +158,9 @@ def main():
 
     torch.utils.backcompat.broadcast_warning.enabled = True
 
+    n_feature_frame = int(args.num_frame)
+    print('[Info] 视频处理帧数: {}'.format(n_feature_frame))
+
     if args.database == 'KoNViD-1k':
         features_dir = 'CNN_features_KoNViD-1k/'  # features dir
         datainfo = 'data/KoNViD-1kinfo.mat'  # database info: video_names, scores; video format, width, height, index, ref_ids, max_len, etc.
@@ -168,7 +171,7 @@ def main():
         features_dir = 'CNN_features_LIVE-Qualcomm/'
         datainfo = 'data/LIVE-Qualcomminfo.mat'
     if args.database == 'LIVE-VQC':
-        features_dir = 'CNN_features_LIVE-VQC-25/'
+        features_dir = 'CNN_features_LIVE-VQC-{}/'.format(n_feature_frame)
         datainfo = None
 
     print('EXP ID: {}'.format(args.exp_id))
@@ -178,10 +181,11 @@ def main():
     device = torch.device("cuda" if not args.disable_gpu and torch.cuda.is_available() else "cpu")
 
     if args.database == "LIVE-VQC":
+        print('[Info] 特征文件夹: {}'.format(features_dir))
         index = get_livevqc_index(features_dir)
         ref_ids = copy.deepcopy(index)
         random.shuffle(index)
-        max_len = 25
+        max_len = n_feature_frame
         scale = 100
     else:
         Info = h5py.File(datainfo, 'r')  # index, ref_ids
