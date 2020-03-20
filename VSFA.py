@@ -79,13 +79,15 @@ class VSFA(nn.Module):
         super(VSFA, self).__init__()
         self.hidden_size = hidden_size
         self.ann = ANN(input_size, reduced_size, 1)
+        self.is_bi = is_bi
         if not is_bi:
             print('[Info] GRU 普通模式')
             self.rnn = nn.GRU(reduced_size, hidden_size, batch_first=True)
+            self.q = nn.Linear(hidden_size, 1)
         else:
             print('[Info] GRU 双向模式')
             self.rnn = nn.GRU(reduced_size, hidden_size, batch_first=True, bidirectional=True)
-        self.q = nn.Linear(hidden_size, 1)
+            self.q = nn.Linear(hidden_size * 2, 1)
 
     def forward(self, input, input_length):
         input = self.ann(input)  # dimension reduction
@@ -99,7 +101,10 @@ class VSFA(nn.Module):
         return score
 
     def _get_initial_state(self, batch_size, device):
-        h0 = torch.zeros(1, batch_size, self.hidden_size, device=device)
+        if not self.is_bi:
+            h0 = torch.zeros(1, batch_size, self.hidden_size, device=device)
+        else:
+            h0 = torch.zeros(1 * 2, batch_size, self.hidden_size, device=device)
         return h0
 
 
@@ -150,8 +155,12 @@ def main():
     parser.add_argument('--num_frame', type=int, default=25, help='num frame of features')
     args = parser.parse_args()
 
-    # 参考
+    # 测试参数
     # args.database = "LIVE-VQC"
+    # args.num_frame = 25
+    # args.model = "VSFA-bi"
+    # ---------------------------------------- #
+
     args.decay_interval = int(args.epochs / 10)
     args.decay_ratio = 0.8
 
