@@ -75,11 +75,14 @@ def TP(q, tau=12, beta=0.5):
 
 
 class VSFA(nn.Module):
-    def __init__(self, input_size=4096, reduced_size=128, hidden_size=32):
+    def __init__(self, input_size=4096, reduced_size=128, hidden_size=32, is_bi=False):
         super(VSFA, self).__init__()
         self.hidden_size = hidden_size
         self.ann = ANN(input_size, reduced_size, 1)
-        self.rnn = nn.GRU(reduced_size, hidden_size, batch_first=True)
+        if not is_bi:
+            self.rnn = nn.GRU(reduced_size, hidden_size, batch_first=True)
+        else:
+            self.rnn = nn.GRU(reduced_size, hidden_size, batch_first=True, bidirectional=True)
         self.q = nn.Linear(hidden_size, 1)
 
     def forward(self, input, input_length):
@@ -228,7 +231,10 @@ def main():
         test_dataset = VQADataset(features_dir, test_index, max_len, scale=scale)
         test_loader = torch.utils.data.DataLoader(dataset=test_dataset)
 
-    model = VSFA().to(device)  #
+    if args.model == 'VSFA':
+        model = VSFA().to(device)  #
+    elif args.model == 'VSFA-bi':
+        model = VSFA(is_bi=True).to(device)  #
 
     if not os.path.exists('models'):
         os.makedirs('models')
