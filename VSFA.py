@@ -80,8 +80,10 @@ class VSFA(nn.Module):
         self.hidden_size = hidden_size
         self.ann = ANN(input_size, reduced_size, 1)
         if not is_bi:
+            print('[Info] GRU 普通模式')
             self.rnn = nn.GRU(reduced_size, hidden_size, batch_first=True)
         else:
+            print('[Info] GRU 双向模式')
             self.rnn = nn.GRU(reduced_size, hidden_size, batch_first=True, bidirectional=True)
         self.q = nn.Linear(hidden_size, 1)
 
