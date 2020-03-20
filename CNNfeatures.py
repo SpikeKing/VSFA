@@ -383,13 +383,14 @@ def main():
     parser.add_argument('--disable_gpu', action='store_true',
                         help='flag whether to disable GPU')
     parser.add_argument('--max_frames', type=int, help='max frames from videos')
+    parser.add_argument('--multi_prc', action='store_true', default=False, help='multi process of opencv')
 
     args = parser.parse_args()
 
-    args.seed = 19920517
-    args.database = "LIVE-VQC"
-    args.frame_batch_size = 64
-    args.disable_gpu = False
+    # args.seed = 19920517
+    # args.database = "LIVE-VQC"
+    # args.frame_batch_size = 64
+    # args.disable_gpu = False
 
     torch.manual_seed(args.seed)  #
     torch.backends.cudnn.deterministic = True
@@ -414,7 +415,11 @@ def main():
     if args.database == 'LIVE-VQC':
         # n_max = 25  # 最大处理帧数
         n_max = args.max_frames  # 最大处理帧数
+        is_mp = args.multi_prc  # 是否使用多进程
+
         print('[Info] LIVE-VQC 最大帧数: {}'.format(n_max))
+        print('[Info] 是否使用多进程提取特征: {}'.format(is_mp))
+
         videos_dir = os.path.join(DATASETS_DIR, 'live_vqc')  # 视频文件夹
         features_dir = "CNN_features_LIVE-VQC-{}/".format(n_max)  # CNN特征
         datainfo = 'data/LIVE-VQC.mat'  # 数据信息
@@ -435,7 +440,7 @@ def main():
             ws.write(0, i, t)
 
         vid_names, ni_dict = get_vqc_mat_info(videos_dir)
-        dataset = VideoDatasetWithOpenCV(vid_names, ni_dict, n_max)
+        dataset = VideoDatasetWithOpenCV(vid_names, ni_dict, n_max, is_mp)
         vid_names = dataset.get_vid_names()
 
         feature_list = get_processed_vids(features_dir)
