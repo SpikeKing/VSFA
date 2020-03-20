@@ -126,7 +126,7 @@ def main():
     parser.add_argument('--database', default='CVD2014', type=str,
                         help='database name (default: CVD2014)')
     parser.add_argument('--model', default='VSFA', type=str,
-                        help='model name (default: VSFA)')
+                        help='model name (default: VSFA), or VSFA-bi')
     parser.add_argument('--exp_id', default=0, type=int,
                         help='exp id for train-val-test splits (default: 0)')
     parser.add_argument('--test_ratio', type=float, default=0.2,
@@ -179,7 +179,7 @@ def main():
 
     print('EXP ID: {}'.format(args.exp_id))
     print(args.database)
-    print(args.model)
+    print('[Info] 模型名称: {}'.format(args.model))
 
     device = torch.device("cuda" if not args.disable_gpu and torch.cuda.is_available() else "cpu")
 
