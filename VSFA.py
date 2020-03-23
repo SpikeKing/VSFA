@@ -152,7 +152,7 @@ def train_dataset(args, device, features_dir, train_index, val_index, test_index
     scheduler = lr_scheduler.StepLR(optimizer, step_size=args.decay_interval, gamma=args.decay_ratio)
     best_val_criterion = -1  # SROCC min
 
-    no_best = 0  # 没有算法进展
+    no_best, max_best = 0, 50  # 没有算法进展
     for epoch in range(args.epochs):
         # Train
         model.train()
@@ -242,7 +242,7 @@ def train_dataset(args, device, features_dir, train_index, val_index, test_index
         else:
             no_best += 1
             print('[Info] 算法没有进展! {}'.format(no_best))
-            if no_best > 100:
+            if no_best > max_best:
                 break
 
     # Test
