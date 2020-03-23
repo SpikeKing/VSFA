@@ -151,6 +151,8 @@ def train_dataset(args, device, features_dir, train_index, val_index, test_index
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=args.decay_interval, gamma=args.decay_ratio)
     best_val_criterion = -1  # SROCC min
+
+    no_best = 0  # 没有算法进展
     for epoch in range(args.epochs):
         # Train
         model.train()
@@ -220,7 +222,6 @@ def train_dataset(args, device, features_dir, train_index, val_index, test_index
                 writer.add_scalar("PLCC/test", PLCC, epoch)  #
                 writer.add_scalar("RMSE/test", RMSE, epoch)  #
 
-        no_best = 0
         # Update the model with the best val_SROCC
         if val_SROCC > best_val_criterion:
             print()
