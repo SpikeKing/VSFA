@@ -384,8 +384,8 @@ def main():
         scale = Info['scores'][0, :].max()  # label normalization factor
 
     if args.database == "LIVE-VQC":
-
-        save_result_file = "live-vqc-5cross.npz"
+        save_result_file = "live-vqc-5cross-{}-{}.npz".format(args.num_frame, args.model)
+        print('[Info] 训练存储信息: {}'.format(save_result_file))
         nc = 5  # 交叉验证
         idxes_list = split_index(index, nc)
         loss_list, srocc_list, krocc_list, plcc_list, rmse_list = [], [], [], [], []
