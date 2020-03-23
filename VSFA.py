@@ -234,11 +234,13 @@ def train_dataset(args, device, features_dir, train_index, val_index, test_index
                 np.save(save_result_file, (y_pred, y_test, test_loss, SROCC, KROCC, PLCC, RMSE, test_index))
             torch.save(model.state_dict(), trained_model_file)
             best_val_criterion = val_SROCC  # update best val SROCC
-            print('[Info] 最优结果 best_val_criterion: {}'.format(best_val_criterion))
+
             no_best = 0
+            print('[Info] 算法持续优化! {}'.format(no_best))
+            print('[Info] 最优结果 best_val_criterion: {}'.format(best_val_criterion))
         else:
             no_best += 1
-            print('[Info] 算法没有进展!')
+            print('[Info] 算法没有进展! {}'.format(no_best))
             if no_best > 100:
                 break
 
