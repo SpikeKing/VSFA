@@ -120,120 +120,7 @@ def get_livevqc_index(feature_dir):
     return res_names
 
 
-def main():
-    parser = ArgumentParser(description='"VSFA: Quality Assessment of In-the-Wild Videos')
-    parser.add_argument("--seed", type=int, default=19920517)
-    parser.add_argument('--lr', type=float, default=0.00001,
-                        help='learning rate (default: 0.00001)')
-    parser.add_argument('--batch_size', type=int, default=16,
-                        help='input batch size for training (default: 16)')
-    parser.add_argument('--epochs', type=int, default=2000,
-                        help='number of epochs to train (default: 2000)')
-
-    parser.add_argument('--database', default='CVD2014', type=str,
-                        help='database name (default: CVD2014)')
-    parser.add_argument('--model', default='VSFA', type=str,
-                        help='model name (default: VSFA), or VSFA-bi')
-    parser.add_argument('--exp_id', default=0, type=int,
-                        help='exp id for train-val-test splits (default: 0)')
-    parser.add_argument('--test_ratio', type=float, default=0.2,
-                        help='test ratio (default: 0.2)')
-    parser.add_argument('--val_ratio', type=float, default=0.2,
-                        help='val ratio (default: 0.2)')
-
-    parser.add_argument('--weight_decay', type=float, default=0.0,
-                        help='weight decay (default: 0.0)')
-
-    parser.add_argument("--notest_during_training", action='store_true',
-                        help='flag whether to test during training')
-    parser.add_argument("--disable_visualization", action='store_true',
-                        help='flag whether to enable TensorBoard visualization')
-    parser.add_argument("--log_dir", type=str, default="logs",
-                        help="log directory for Tensorboard log output")
-    parser.add_argument('--disable_gpu', action='store_true',
-                        help='flag whether to disable GPU')
-    parser.add_argument('--num_frame', type=int, default=25, help='num frame of features')
-    args = parser.parse_args()
-
-    # 测试参数
-    # args.database = "LIVE-VQC"
-    # args.num_frame = 25
-    # args.model = "VSFA-bi"
-    # ---------------------------------------- #
-
-    args.decay_interval = int(args.epochs / 10)
-    args.decay_ratio = 0.8
-
-    torch.manual_seed(args.seed)  #
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(args.seed)
-    random.seed(args.seed)
-
-    torch.utils.backcompat.broadcast_warning.enabled = True
-
-    n_feature_frame = int(args.num_frame)
-    print('[Info] 视频处理帧数: {}'.format(n_feature_frame))
-
-    if args.database == 'KoNViD-1k':
-        features_dir = 'CNN_features_KoNViD-1k/'  # features dir
-        datainfo = 'data/KoNViD-1kinfo.mat'  # database info: video_names, scores; video format, width, height, index, ref_ids, max_len, etc.
-    if args.database == 'CVD2014':
-        features_dir = 'CNN_features_CVD2014/'
-        datainfo = 'data/CVD2014info.mat'
-    if args.database == 'LIVE-Qualcomm':
-        features_dir = 'CNN_features_LIVE-Qualcomm/'
-        datainfo = 'data/LIVE-Qualcomminfo.mat'
-    if args.database == 'LIVE-VQC':
-        features_dir = 'CNN_features_LIVE-VQC-{}/'.format(n_feature_frame)
-        datainfo = None
-
-    print('EXP ID: {}'.format(args.exp_id))
-    print(args.database)
-    print('[Info] 模型名称: {}'.format(args.model))
-
-    device = torch.device("cuda" if not args.disable_gpu and torch.cuda.is_available() else "cpu")
-
-    if args.database == "LIVE-VQC":
-        print('[Info] 特征文件夹: {}'.format(features_dir))
-        index = get_livevqc_index(features_dir)
-        ref_ids = copy.deepcopy(index)
-        random.shuffle(index)
-        max_len = n_feature_frame
-        scale = 100
-    else:
-        Info = h5py.File(datainfo, 'r')  # index, ref_ids
-        index = Info['index']
-        index = index[:, args.exp_id % index.shape[1]]  # np.random.permutation(N)
-        ref_ids = Info['ref_ids'][0, :]  #
-        max_len = int(Info['max_len'][0])
-        scale = Info['scores'][0, :].max()  # label normalization factor
-
-    trainindex = index[0:int(np.ceil((1 - args.test_ratio - args.val_ratio) * len(index)))]
-    testindex = index[int(np.ceil((1 - args.test_ratio) * len(index))):len(index)]
-    train_index, val_index, test_index = [], [], []
-    for i in range(len(ref_ids)):
-        train_index.append(i) if (ref_ids[i] in trainindex) else \
-            test_index.append(i) if (ref_ids[i] in testindex) else \
-                val_index.append(i)
-
-    if args.database == "LIVE-VQC":
-        names = get_livevqc_index(features_dir)
-        train_index_tmp = []
-        for i in train_index:
-            train_index_tmp.append(names[i])
-        train_index = train_index_tmp
-
-        val_index_tmp = []
-        for i in val_index:
-            val_index_tmp.append(names[i])
-        val_index = val_index_tmp
-
-        test_index_tmp = []
-        for i in test_index:
-            test_index_tmp.append(names[i])
-        test_index = test_index_tmp
-
+def train_dataset(args, device, features_dir, train_index, val_index, test_index, max_len, scale, n_cross=0):
     train_dataset = VQADataset(features_dir, train_index, max_len, scale=scale)
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
     val_dataset = VQADataset(features_dir, val_index, max_len, scale=scale)
@@ -249,10 +136,10 @@ def main():
 
     if not os.path.exists('models'):
         os.makedirs('models')
-    trained_model_file = 'models/{}-{}-EXP{}.pt'.format(args.model, args.database, args.exp_id)
+    trained_model_file = 'models/{}-{}-EXP{}-{}.pt'.format(args.model, args.database, args.exp_id, n_cross)
     if not os.path.exists('results'):
         os.makedirs('results')
-    save_result_file = 'results/{}-{}-EXP{}'.format(args.model, args.database, args.exp_id)
+    save_result_file = 'results/{}-{}-EXP{}-{}'.format(args.model, args.database, args.exp_id, n_cross)
 
     if not args.disable_visualization:  # Tensorboard Visualization
         writer = SummaryWriter(log_dir='{}/EXP{}-{}-{}-{}-{}-{}-{}'
@@ -333,6 +220,7 @@ def main():
                 writer.add_scalar("PLCC/test", PLCC, epoch)  #
                 writer.add_scalar("RMSE/test", RMSE, epoch)  #
 
+        no_best = 0
         # Update the model with the best val_SROCC
         if val_SROCC > best_val_criterion:
             print()
@@ -347,6 +235,12 @@ def main():
             torch.save(model.state_dict(), trained_model_file)
             best_val_criterion = val_SROCC  # update best val SROCC
             print('[Info] 最优结果 best_val_criterion: {}'.format(best_val_criterion))
+            no_best = 0
+        else:
+            no_best += 1
+            print('[Info] 算法没有进展!')
+            if no_best > 100:
+                break
 
     # Test
     if args.test_ratio > 0:
@@ -372,6 +266,174 @@ def main():
         print("Test results: test loss={:.4f}, SROCC={:.4f}, KROCC={:.4f}, PLCC={:.4f}, RMSE={:.4f}"
               .format(test_loss, SROCC, KROCC, PLCC, RMSE))
         np.save(save_result_file, (y_pred, y_test, test_loss, SROCC, KROCC, PLCC, RMSE, test_index))
+
+    if args.test_ratio > 0:
+        return test_loss, SROCC, KROCC, PLCC, RMSE
+    else:
+        return []
+
+
+def split_index(index, nc=5):
+    """
+    拆分index
+    """
+    n_sample = len(index)
+    gap = int(np.ceil(n_sample / nc))
+    idxes_list = []
+
+    for s in range(0, n_sample, gap):
+        e = s + gap
+        if e > n_sample:
+            e = n_sample
+        s_index = index[s:e]
+        idxes_list.append(s_index)
+
+    return idxes_list
+
+
+def main():
+    parser = ArgumentParser(description='"VSFA: Quality Assessment of In-the-Wild Videos')
+    parser.add_argument("--seed", type=int, default=19920517)
+    parser.add_argument('--lr', type=float, default=0.00001,
+                        help='learning rate (default: 0.00001)')
+    parser.add_argument('--batch_size', type=int, default=16,
+                        help='input batch size for training (default: 16)')
+    parser.add_argument('--epochs', type=int, default=2000,
+                        help='number of epochs to train (default: 2000)')
+
+    parser.add_argument('--database', default='CVD2014', type=str,
+                        help='database name (default: CVD2014)')
+    parser.add_argument('--model', default='VSFA', type=str,
+                        help='model name (default: VSFA), or VSFA-bi')
+    parser.add_argument('--exp_id', default=0, type=int,
+                        help='exp id for train-val-test splits (default: 0)')
+    parser.add_argument('--test_ratio', type=float, default=0.2,
+                        help='test ratio (default: 0.2)')
+    parser.add_argument('--val_ratio', type=float, default=0.2,
+                        help='val ratio (default: 0.2)')
+
+    parser.add_argument('--weight_decay', type=float, default=0.0,
+                        help='weight decay (default: 0.0)')
+
+    parser.add_argument("--notest_during_training", action='store_true',
+                        help='flag whether to test during training')
+    parser.add_argument("--disable_visualization", action='store_true',
+                        help='flag whether to enable TensorBoard visualization')
+    parser.add_argument("--log_dir", type=str, default="logs",
+                        help="log directory for Tensorboard log output")
+    parser.add_argument('--disable_gpu', action='store_true',
+                        help='flag whether to disable GPU')
+    parser.add_argument('--num_frame', type=int, default=25, help='num frame of features')
+    args = parser.parse_args()
+
+    # 测试参数
+    # args.database = "LIVE-VQC"
+    # args.num_frame = 25
+    # args.model = "VSFA"
+    # ---------------------------------------- #
+
+    args.decay_interval = int(args.epochs / 10)
+    args.decay_ratio = 0.8
+
+    torch.manual_seed(args.seed)  #
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+
+    torch.utils.backcompat.broadcast_warning.enabled = True
+
+    n_feature_frame = int(args.num_frame)
+    print('[Info] 视频处理帧数: {}'.format(n_feature_frame))
+
+    if args.database == 'KoNViD-1k':
+        features_dir = 'CNN_features_KoNViD-1k/'  # features dir
+        datainfo = 'data/KoNViD-1kinfo.mat'  # database info: video_names, scores; video format, width, height, index, ref_ids, max_len, etc.
+    if args.database == 'CVD2014':
+        features_dir = 'CNN_features_CVD2014/'
+        datainfo = 'data/CVD2014info.mat'
+    if args.database == 'LIVE-Qualcomm':
+        features_dir = 'CNN_features_LIVE-Qualcomm/'
+        datainfo = 'data/LIVE-Qualcomminfo.mat'
+    if args.database == 'LIVE-VQC':
+        features_dir = 'CNN_features_LIVE-VQC-{}/'.format(n_feature_frame)
+        datainfo = None
+
+    print('EXP ID: {}'.format(args.exp_id))
+    print(args.database)
+    print('[Info] 模型名称: {}'.format(args.model))
+
+    device = torch.device("cuda" if not args.disable_gpu and torch.cuda.is_available() else "cpu")
+
+    if args.database == "LIVE-VQC":
+        print('[Info] 特征文件夹: {}'.format(features_dir))
+        index = get_livevqc_index(features_dir)
+        ref_ids = copy.deepcopy(index)
+        random.shuffle(index)
+        max_len = n_feature_frame
+        scale = 100
+    else:
+        Info = h5py.File(datainfo, 'r')  # index, ref_ids
+        index = Info['index']
+        index = index[:, args.exp_id % index.shape[1]]  # np.random.permutation(N)
+        ref_ids = Info['ref_ids'][0, :]  #
+        max_len = int(Info['max_len'][0])
+        scale = Info['scores'][0, :].max()  # label normalization factor
+
+    if args.database == "LIVE-VQC":
+
+        save_result_file = "live-vqc-5cross.npz"
+        nc = 5  # 交叉验证
+        idxes_list = split_index(index, nc)
+        loss_list, srocc_list, krocc_list, plcc_list, rmse_list = [], [], [], [], []
+        for i in range(nc):
+            print('-' * 100)
+            test_index = idxes_list[i % nc]
+            val_index = idxes_list[(i + 1) % nc]
+
+            train_index = []
+            for j in range((i + 2), (i + nc)):
+                train_index += idxes_list[j % nc]
+            print('[Info] 训练: {}, 测试: {}, 验证: {}'.format(len(train_index), len(test_index), len(val_index)))
+
+            test_loss, SROCC, KROCC, PLCC, RMSE = train_dataset(args=args, device=device, features_dir=features_dir,
+                                                                train_index=train_index, val_index=val_index,
+                                                                test_index=test_index,
+                                                                max_len=max_len, scale=scale, n_cross=i)
+
+            print("Test results: test loss={:.4f}, SROCC={:.4f}, KROCC={:.4f}, PLCC={:.4f}, RMSE={:.4f}"
+                  .format(test_loss, SROCC, KROCC, PLCC, RMSE))
+
+            loss_list.append(np.round(test_loss, 4))
+            srocc_list.append(np.round(SROCC, 4))
+            krocc_list.append(np.round(KROCC, 4))
+            plcc_list.append(np.round(PLCC, 4))
+            rmse_list.append(np.round(RMSE, 4))
+            print('[Info] 第 {} 次 交叉验证完成!'.format(i))
+            print('-' * 100)
+            print()
+
+        np.savez(save_result_file,
+                 loss_list=np.asarray(loss_list),
+                 srocc_list=np.asarray(srocc_list),
+                 krocc_list=np.asarray(krocc_list),
+                 plcc_list=np.asarray(plcc_list),
+                 rmse_list=np.asarray(rmse_list))
+
+
+    else:
+        trainindex = index[0:int(np.ceil((1 - args.test_ratio - args.val_ratio) * len(index)))]
+        testindex = index[int(np.ceil((1 - args.test_ratio) * len(index))):len(index)]
+
+        train_index, val_index, test_index = [], [], []
+        for i in range(len(ref_ids)):
+            train_index.append(i) if (ref_ids[i] in trainindex) else \
+                test_index.append(i) if (ref_ids[i] in testindex) else \
+                    val_index.append(i)
+
+        train_dataset(args=args, device=device, features_dir=features_dir,
+                      train_index=train_index, val_index=val_index, test_index=test_index,
+                      max_len=max_len, scale=scale)
 
 
 if __name__ == "__main__":
