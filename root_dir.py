@@ -11,5 +11,6 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))  # 存储项目所在的�
 
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
 DATASETS_DIR = os.path.join(ROOT_DIR, 'datasets')
+RESULTS_DIR = os.path.join(ROOT_DIR, 'results')
 
 MODELS_DIR = os.path.join(ROOT_DIR, 'models')
